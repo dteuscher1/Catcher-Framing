@@ -25,6 +25,33 @@ strike_zone %+% sample_n(caught_pitches, 10000) +
     geom_point(alpha = .3) + 
     scale_color_manual(values = c("gray", "navyblue"))
 
+zones <- caught_pitches %>%
+    group_by(zone) %>%
+    summarize(
+        N = n(), 
+        right_edge = min(2, max(plate_x)), 
+        left_edge = max(-2, min(plate_x)),
+        top_edge = min(5, quantile(plate_z, 0.95, na.rm = TRUE)), 
+        bottom_edge = max(0, quantile(plate_z, 0.05, na.rm = TRUE)),
+        strike_pct = sum(type == "S") / n(),
+        plate_x = mean(plate_x), 
+        plate_z = mean(plate_z))
+
+library(ggrepel)
+library(plotly)
+
+p <- strike_zone %+% zones + 
+    geom_rect(aes(xmax = right_edge, xmin = left_edge,
+                  ymax = top_edge, ymin = bottom_edge,
+                  fill = strike_pct, alpha = strike_pct), 
+              color = "lightgray") +
+    geom_text_repel(size = 3, aes(label = round(strike_pct, 2),
+                                  color = strike_pct < 0.5)) + 
+    scale_fill_gradient(low = "gray70", high = "navyblue") + 
+    scale_color_manual(values = c("white", "black")) +
+    guides(color = FALSE, alpha = FALSE)
+p
+
 library(mgcv)
 model <- gam(type == 'S' ~ s(plate_x, plate_z) + release_speed, family = binomial, data = sample_n(caught_pitches, 100000))
 summary(model)
