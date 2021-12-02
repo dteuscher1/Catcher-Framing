@@ -53,21 +53,52 @@ p <- strike_zone %+% zones +
 p
 
 library(mgcv)
-model <- gam(type == 'S' ~ s(plate_x, plate_z) + release_speed, family = binomial, data = sample_n(caught_pitches, 100000))
+model_data <- sample_n(caught_pitches, 100000)
+model <- gam(type == 'S' ~ s(plate_x, plate_z) + factor(stand) + factor(p_throws), family = binomial, data = model_data)
+model2 <- gam(type == 'S' ~ s(plate_x, plate_z) + release_speed, family = binomial, data = model_data)
 summary(model)
-
+anova(model2, model)
+AIC(model)
+AIC(model2)
 #preds <- predict(model, newdata = sample_n(caught_pitches, 100000), type = "response")
 library(broom)
 hats <- model %>%
-    augment(type.predict = "response")
+    augment(newdata = caught_pitches, type.predict = "response")
 
+head(hats)
 ## ----gam_k_zone, warning=FALSE, fig.cap="Estimated strike probability for taken pitches using a generalized additive model. "----
+
 strike_zone %+% sample_n(hats, 50000) +
     geom_point(aes(color = .fitted), alpha = 0.1) + 
-    scale_color_gradient(low = "gray70", high = "navyblue")
+    scale_color_gradient(low = "gray", high = "red")
+
+strike_zone %+% sample_n(hats, 50000) +
+    geom_point(aes(color = .se.fit), alpha = 0.5) + 
+    scale_color_gradient(low = "gray", high = "navyblue")
 
 strike_zone %+% sample_n(hats, 50000) +
     geom_point(aes(color = .se.fit), alpha = 0.1) + 
-    scale_color_gradient(low = "gray70", high = "navyblue")
+    scale_color_gradient(low = "gray", high = "navyblue")
 
 head(caught_pitches)
+library(pitchRx)
+
+library(lme4)
+
+mixed_1 <- glmer(type == "S" ~ .fitted + (1|fielder_2) + (1|pitcher) + (1|stand) + (1|inning_topbot) + (1|.fitted:fielder_2),
+               data = sample_n(hats, 100000), family = binomial, nAGQ = 0)
+summary(mixed_1)
+View(hats[1:6, ])
+library(modelr)
+
+catchers <- read.csv("catcher_ids.csv") %>%
+    mutate(key_mlbam = factor(key_mlbam))
+random.effects(mixed_1) %>% data.frame() %>%
+    inner_join(catchers, by = c("grp" = 'key_mlbam')) %>% arrange(desc(condval)) %>%
+    head(10)
+
+random.effects(mixed_1) %>% data.frame() %>%
+    inner_join(catchers, by = c("grp" = 'key_mlbam')) %>% arrange(condval) %>%
+    head(10)
+r_eff
+
