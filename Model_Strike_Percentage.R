@@ -33,32 +33,8 @@ strike_zone %+% sample_n(caught_pitches, 7000) +
                        labels = c("Ball", "Strike"))
 
 ggsave("pitches.jpg")
-zones <- caught_pitches %>%
-    group_by(zone) %>%
-    summarize(
-        N = n(), 
-        right_edge = min(2, max(plate_x)), 
-        left_edge = max(-2, min(plate_x)),
-        top_edge = min(5, quantile(plate_z, 0.95, na.rm = TRUE)), 
-        bottom_edge = max(0, quantile(plate_z, 0.05, na.rm = TRUE)),
-        strike_pct = sum(type == "S") / n(),
-        plate_x = mean(plate_x), 
-        plate_z = mean(plate_z))
 
-library(ggrepel)
-library(plotly)
 
-p <- strike_zone %+% zones + 
-    geom_rect(aes(xmax = right_edge, xmin = left_edge,
-                  ymax = top_edge, ymin = bottom_edge,
-                  fill = strike_pct, alpha = strike_pct), 
-              color = "lightgray") +
-    geom_text_repel(size = 3, aes(label = round(strike_pct, 2),
-                                  color = strike_pct < 0.5)) + 
-    scale_fill_gradient(low = "gray70", high = "navyblue") + 
-    scale_color_manual(values = c("white", "black")) +
-    guides(color = FALSE, alpha = FALSE)
-p
 
 library(mgcv)
 model_data <- sample_n(caught_pitches, 100000)
@@ -75,21 +51,22 @@ hats <- model %>%
     augment(newdata = caught_pitches, type.predict = "response")
 
 grid <- caught_pitches %>%
-    data_grid(plate_x = seq(-2, 2, length.out = 100),
-              plate_z = seq(0, 5, length.out = 100),
+    data_grid(plate_x = seq(-2, 2, length.out = 25),
+              plate_z = seq(0, 5, length.out = 25),
               p_throws, stand)
 grid_hat <- model %>%
     augment(newdata = grid, type.predict = "response")
-head(grid_hat)
 ## ----gam_k_zone, warning=FALSE, fig.cap="Estimated strike probability for taken pitches using a generalized additive model. "----
 
-strike_zone %+% sample_n(hats, 50000) +
-    geom_point(aes(color = .fitted), alpha = 0.1) + 
-    scale_color_gradient(low = "gray", high = "red")
+strike_zone %+% grid_hat +
+    geom_tile(aes(fill = .fitted), alpha = 0.4) + 
+    scale_fill_gradient("Strike Probability", low = "gray", high = "deepskyblue4")
+ggsave("strike_prob.jpg")
 
 strike_zone %+% grid_hat +
-    geom_tile(aes(fill= .fitted), alpha = 0.7) + 
-    scale_fill_gradient(low = "white", high = "navyblue")
+    geom_tile(aes(fill= .se.fit), alpha = 0.4) + 
+    scale_fill_gradient("Standard Errors", low = "gray", high = "deepskyblue4")
+ggsave("se_prob.jpg")
 
 strike_zone %+% grid_hat +
     geom_tile(aes(fill = .se.fit), alpha = 0.7) + 
