@@ -1,0 +1,74 @@
+---
+title: "Model Strike Probability for MLB Pitches"
+author: "David Teuscher"
+date: "December 11, 2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.align = 'center')
+library(tidyverse)
+library(mgcv)
+library(broom)
+library(modelr)
+library(lme4)
+```
+
+```{r}
+library(tidyverse)
+data_2021 <- read_csv("statcast_2021.csv")
+umpires <- read_csv("plate_umpires_2021.csv")
+catchers <- read_csv("catcher_ids.csv") 
+caught_pitches <- data_2021 %>% 
+    filter(description %in% c("ball", "called_strike")) %>% 
+    filter(fielder_2 != 1000000000) %>%
+    inner_join(umpires, by = 'game_pk') %>%
+    inner_join(catchers, by = c("fielder_2" = 'key_mlbam')) %>%
+    mutate(fielder_2 = factor(fielder_2))
+```
+
+# Introduction
+
+In recent years, Major League Baseball (MLB) teams have become interested signing catchers who are able to frame pitches. Framing is considered to be a skill of the catcher where he is able to make a pitch appear to be a strike when it is not. As a result of the development of new tracking technology in recent years, teams have been able to better measure the ability of a catcher to frame pitches. 
+
+
+# Exploratory Data Analysis
+```{r}
+plate_width <- 17 + 2 * (9/pi)
+strike_zone <- ggplot(NULL, aes(x = plate_x, y = plate_z)) + 
+    geom_rect(xmin = -(plate_width/2)/12,
+              xmax = (plate_width/2)/12,
+              ymin = 1.5,
+              ymax = 3.5, color = "black", alpha = 0) + 
+    coord_equal() + 
+    scale_x_continuous("Horizontal pitch location (ft.)",
+                       limits = c(-2, 2)) +
+    scale_y_continuous("Vertical pitch location (ft.)",
+                       limits = c(0, 5)) +
+    theme_light() + 
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.border = element_blank(), 
+          axis.line = element_line(color = 'black'))
+
+strike_zone %+% sample_n(caught_pitches, 7000) + 
+    aes(color = type) + 
+    geom_point(alpha = .5) + 
+    scale_color_manual("Pitch Result", 
+                       values = c("darkgoldenrod", "royalblue4"), 
+                       labels = c("Ball", "Strike"))
+```
+
+
+# Models
+
+```{r}
+
+```
+
+
+# Model Justification
+
+# Results
+
+# Conclusions
