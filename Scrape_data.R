@@ -1,5 +1,17 @@
+# Date of most recent changes: 19.12.21
+# Author: David Teuscher
+# The script uses the baseballr package to scrape all Statcast pitch data
+# for the 2021 season
+####################################
+
+# Load packages
 library(baseballr)
 library(tidyverse)
+
+# Function used to pull in the data, loading the data 1 week at a time
+# Code comes from a blog post by Bill Petti who developed the baseballr package
+# https://billpetti.github.io/2021-04-02-build-statcast-database-rstats-version-3.0/
+
 annual_statcast_query <- function(season) {
     
     dates <- seq.Date(as.Date(paste0(season, '-03-01')),
@@ -36,6 +48,7 @@ annual_statcast_query <- function(season) {
     
 }
 
+# Function to format some of the Statcast data
 format_append_statcast <- function(df) {
     
     # function for appending new variables to the data set
@@ -122,8 +135,11 @@ format_append_statcast <- function(df) {
     return(df)
 }
 
+# Load the data
 payload_statcast <- annual_statcast_query(2021)
 
+# Format the data
 df <- format_append_statcast(df = payload_statcast)    
 
-write.csv(df, file = "statcast_2021.csv")
+# Write the data to .csv file, if desired
+#write.csv(df, file = "statcast_2021.csv")

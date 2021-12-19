@@ -6,7 +6,9 @@ output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
+# Set options for markdown document
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.align = 'center', out.width = '85%')
+# Load packages
 library(tidyverse)
 library(mgcv)
 library(broom)
@@ -16,13 +18,16 @@ library(patchwork)
 ```
 
 ```{r}
-library(tidyverse)
+# Read in data sets
 data_2021 <- read_csv("statcast_2021.csv")
 umpires <- read_csv("plate_umpires_2021.csv")
 catchers <- read_csv("catcher_ids.csv") 
+
+# Filter for pitchers batters didn't swing at and where the catcher is recorded
 caught_pitches <- data_2021 %>% 
     filter(description %in% c("ball", "called_strike")) %>% 
     filter(fielder_2 != 1000000000) %>%
+    # Join the pitch data with the catcher and umpire datasets
     inner_join(umpires, by = 'game_pk') %>%
     inner_join(catchers, by = c("fielder_2" = 'key_mlbam')) %>%
     mutate(fielder_2 = factor(fielder_2))
@@ -41,7 +46,10 @@ The remainder of the paper is outlined as follows. The data and source used for 
 The data for this analysis was taken from the 2021 MLB season and was obtained from Baseball Savant, which is a site that pulls in data from each MLB from MLB Advanced Media. The data here is the publicly available information about each pitch that MLB releases. For the 2021 season, there was over 700,000 pitches and there were around 300,000 pitches that were not swung at by the batter, which are used for this analysis. There are a number of variables in the data set, but the ones that are used for this analysis are the horizontal location of a pitch, the vertical location of a pitch, whether a pitcher throws right or left handed, whether a batter hits right or left handed, the catcher, pitcher,  umpire, and whether the pitch was called a strike or ball. These variables are provided for every pitch. 
 
 ```{r}
+# Width of the strike zone
 plate_width <- 17 + 2 * (9/pi)
+# Set generic plot for strike zone; Width is accurate, Height is estimate since
+# the height is dependent on the batter
 strike_zone <- ggplot(NULL, aes(x = plate_x, y = plate_z)) + 
     geom_rect(xmin = -(plate_width/2)/12,
               xmax = (plate_width/2)/12,
@@ -58,6 +66,7 @@ strike_zone <- ggplot(NULL, aes(x = plate_x, y = plate_z)) +
           panel.border = element_blank(), 
           axis.line = element_line(color = 'black'))
 
+# Take a sample of pitches and plot whether they were called a ball or strike
 strike_zone %+% sample_n(caught_pitches, 7000) + 
     aes(color = type) + 
     geom_point(alpha = .5) + 
@@ -88,16 +97,23 @@ $$g(\mu_{ij}) = \bf{x'_i}\beta + \bf{z_i}u$$
 where $y_i$ is whether or not a pitch was called a strike and there is a fixed effect, $\beta$ for the probability of the pitch being called a strike, which is the estimated probability of a pitch being a strike from the GAM previously defined. Random effects are included for the catcher, umpire, and the pitcher in the model. 
 
 ```{r}
+# Take a sample of pitches and fit a GAM with a smoothing function for the 
+# location and linear coefficient for which hand a pitcher throws with and 
+# which side the batter hids from
 model_data <- sample_n(caught_pitches, 100000)
 model <- gam(type == 'S' ~ s(plate_x, plate_z) + stand + p_throws, family = binomial, data = model_data)
-model2 <- gam(type == 'S' ~ s(plate_x, plate_z), family = binomial, data = model_data)
+
+# Get predictions for all of the pitches
 hats <- model %>%
     augment(newdata = caught_pitches, type.predict = "response")
 
+# Create a grid over the strike zone
 grid <- caught_pitches %>%
     data_grid(plate_x = seq(-2, 2, length.out = 25),
               plate_z = seq(0, 5, length.out = 25),
               p_throws, stand)
+
+# Make predictions over the grid
 grid_hat <- model %>%
     augment(newdata = grid, type.predict = "response")
 
@@ -111,10 +127,12 @@ There are a number of justifications that need to be made for the previous model
 Given the shape of the strike zone, the relationship between the horizontal and vertical location and the probability of a pitch being a strike is a complex relationship, so the relationship is better represented by the smooth function instead of a linear component of the log odds of the probability of being a strike. The other variables, whether the batter hits left or right handed and whether the pitcher is right and left handed were included because it seems the the strike zone varies some based on where the pitcher is throwing from and where the batter is standing. Both of these variables were significant and when testing the change in deviance. The AIC for the model decreased by including these variables. As a result, it seemed appropriate to include these variables. 
 
 ```{r}
+# Show the estimated strike probability throughout the zone
 p1 <- strike_zone %+% grid_hat +
     geom_tile(aes(fill = .fitted), alpha = 0.4) + 
     scale_fill_gradient("Strike Probability", low = "gray", high = "deepskyblue4")
 
+# Show the uncertainty in the estimates across the zone
 p2 <- strike_zone %+% grid_hat +
     geom_tile(aes(fill= .se.fit), alpha = 0.4) + 
     scale_fill_gradient("Standard Errors", low = "gray", high = "deepskyblue4")
@@ -144,37 +162,53 @@ Table 1 provides the ten highest random effects for catchers and umpires during 
 
 
 ```{r}
+# Fit GLMM with random effects for catcher, umpire, and pitcher and a fixed 
+# effect for the probability of a strike from the GAM
 mixed_1 <- glmer(type == "S" ~ .fitted  + (1|fielder_2) + (1|pitcher) + (1|name),
                data = hats, family = binomial, nAGQ = 0)
 
+# Read the catcher data in again
 catchers <- read.csv("catcher_ids.csv") %>%
     mutate(key_mlbam = factor(key_mlbam))
 
+# Select the unique umpires
 umpires_total <- umpires %>%
     mutate(name = factor(name)) %>% 
     select(name) %>% unique()
+
+# Pull the random effects from the model
 random_effects <- random.effects(mixed_1) %>% data.frame()
 
-catcher_large <- random_effects %>% filter(grpvar == "fielder_2") %>%
-    inner_join(catchers, by = c("grp" = 'key_mlbam')) %>% arrange(desc(condval)) %>%
+# Get the top ten catcher random effects
+catcher_large <- random_effects %>% 
+    filter(grpvar == "fielder_2") %>%
+    inner_join(catchers, by = c("grp" = 'key_mlbam')) %>% 
+    arrange(desc(condval)) %>%
     head(10)
 
-umpire_large <- random_effects %>% filter(grpvar == "name") %>%
-    inner_join(umpires_total, by = c("grp" = 'name')) %>% arrange(desc(condval)) %>%
+# Get the top ten umpire random effects
+umpire_large <- random_effects %>% 
+    filter(grpvar == "name") %>%
+    inner_join(umpires_total, by = c("grp" = 'name')) %>% 
+    arrange(desc(condval)) %>%
     head(10)
 
+# Format the umpire results to be put into a table
 umpire_results <- umpire_large %>%
     select(grp, condval) %>%
     rename(Umpire = grp)
 
 names(umpire_results) <- c("Umpire", "Random Effect")
 
+# Format the catcher results to be put into a table
 catcher_results <- catcher_large %>%
     select(name_first, name_last, condval) %>%
     mutate(Catcher = paste(name_first, name_last)) %>%
     select(Catcher, condval)
 
 names(catcher_results) <- c("Catcher", "Random Effect")
+
+# Put the results into a table
 knitr::kable(list(umpire_results, catcher_results), 
              caption = "Ten Highest Random Effects for Umpires and Catchers") 
 
@@ -184,27 +218,36 @@ knitr::kable(list(umpire_results, catcher_results),
 Table 2 provides the ten lowest random effects for catchers and umpires during the 2021 season. Again the best way to understand these parameters, rather than a formal interpretation, is to know that the more negative the random effect, the fewer strike calls a catcher got or the umpire called fewer strikes. As a result, a pitcher would not want to pitch to one of these catchers or one of these umpires behind the plate for the game because the catchers don't get extra strikes called and these umpires have a smaller strike zone.  
 
 ```{r}
-
-umpire_small <- random_effects %>% filter(grpvar == "name") %>%
-    inner_join(umpires_total, by = c("grp" = 'name')) %>% arrange(condval) %>%
+# Get the bottom ten umpire random effects
+umpire_small <- random_effects %>% 
+    filter(grpvar == "name") %>%
+    inner_join(umpires_total, by = c("grp" = 'name')) %>% 
+    arrange(condval) %>%
     head(10)
 
-catcher_small <- random_effects %>% filter(grpvar == "fielder_2") %>%
-    inner_join(catchers, by = c("grp" = 'key_mlbam')) %>% arrange(condval) %>%
+# Get the bottom ten catcher random effects
+catcher_small <- random_effects %>% 
+    filter(grpvar == "fielder_2") %>%
+    inner_join(catchers, by = c("grp" = 'key_mlbam')) %>%
+    arrange(condval) %>%
     head(10)
 
+# Format the umpire data for table
 umpire_results <- umpire_small %>%
     select(grp, condval) %>%
     rename(Umpire = grp)
 
 names(umpire_results) <- c("Umpire", "Random Effect")
 
+# Format the catcher data for a table
 catcher_results <- catcher_small %>%
     select(name_first, name_last, condval) %>%
     mutate(Catcher = paste(name_first, name_last)) %>%
     select(Catcher, condval)
 
 names(catcher_results) <- c("Catcher", "Random Effect")
+
+# Output the table of the lowest random effects for catchers and umpires
 knitr::kable(list(umpire_results, catcher_results),
              caption = "Ten Lowest Random Effects for Umpires and Catchers") 
 ```
