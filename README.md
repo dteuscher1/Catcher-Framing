@@ -1,3 +1,19 @@
-# CatcherFraming
+# Catcher Framing
 
-This is a project for my generalized linear models class at BYU. 
+This repository contains work on modeling strike probabilities and estimating catcher and umpire influence on that probability using generalized linear models. This was a project for my generalized linear models class. As a result, the models and approaches currently considered are related to generalized linear models, since the project was done for the class. 
+
+The goals of this analysis were to 1) effectively model the probability of a pitch being called a strike, 2) determine how catchers and umpires influence the probability of a pitch being a strike, and 3) demonstrate the application of generalized linear models to a real-world scenario. 
+
+The data for this analysis was taken from the 2021 MLB season and was obtained using the baseballr package, which scraped the Statcast data for each pitch in the 2021 season. Only pitches that were not swung at by the batter were used in the analysis, which was more than 300,000 pitches 
+
+There were two different models to accomplish the goals of the analysis. The first model was used to model the probability of a pitch being a strike and the second was used to determine the impact of catchers and umpires. A generalized additive model (GAM) was used to estimate the probability of a pitch being a strike based on the location of a pitch, as well as the handedness of the pitcher and the batter. A generalized linear mixed model was used to estimate the individual effects of catchers and umpires by including them as random effects. The second model included the estimated probability of a pitch being a strike from the GAM as a fixed effect and had the umpire, catcher, and pitcher as a random effect in determining the probability of a strike. 
+
+Further details about the models that were fit and justification for these models are included in the report for the project, which is found here. 
+
+The models provide reasonable results since the estimated probability of a strike based on location is practically one for the middle of the strike zone and then decreases around the edges of the strike zone and then quickly becomes essentially zero when pitches are obviously outside of the zone. The uncertainly of these estimates are higher for pitches around the edges of the strike zone, which is the expected result 
+
+The individual random effects for catchers and umpires seem to match other results that have been obtained. The catcher results are similar when comparing to the percentage for pitches called strikes on Baseball Savant and the umpire results provide similar results to another analysis of umpires, which determine which umpires called more and less strike than expected based on the location of pitches. 
+
+There are a number of potential factors that could be furthered. First, it would be useful to calculate the change in run expectancy for each of the pitches where catchers or umpires called a pitch a strike rather than a ball or vise versa, which would allow me to quantify the impact of the catchers and umpires in terms of runs. This would be useful since scoring runs is how a team wins the game and being able to provide a measurement of the amount of runs saved or lost by them would make it easier to understand the scope of impact catcher framing has on a game. Second, the GAM and GLMM that were used in this analysis were very simple and could likely be improved as well to get better umpire and catcher effects. Third, other variables, such as the pitch type, speed, and spin rate could be explored to see how those variables influence the probability of a pitch being a strike. 
+
+If there are any comments or questions about the analysis, I am happy to discuss them with anyone. Feel free to email me at david.teuscher.96@gmail.com or DM me on Twitter. 
